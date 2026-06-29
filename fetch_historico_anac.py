@@ -61,8 +61,9 @@ print(f"Aeroportos filtrados: {', '.join(AIRPORTS)}")
 # Formato do portal ANAC:
 # https://sistemas.anac.gov.br/dadosabertos/Voos%20e%20opera%C3%A7%C3%B5es/VRA/YYYY/AAAAMM.csv
 VRA_URL = (
-    f"https://sistemas.anac.gov.br/dadosabertos/"
-    f"Voos%20e%20opera%C3%A7%C3%B5es%20a%C3%A9reas/Voo%20Regular%20Ativo%20%28VRA%29/{ano}/{ano}{mes}.csv"
+    f"f"https://sistemas.anac.gov.br/dadosabertos/"
+    f"Voos%20e%20opera%C3%A7%C3%B5es%20a%C3%A9reas/Voo%20Regular%20Ativo%20%28VRA%29/{ano}/"
+    f"{mes}%20-%20{nome_mes}/VRA_{ano}{mes}.csv""
 )
 
 # URL alternativa (portal de dados abertos)
