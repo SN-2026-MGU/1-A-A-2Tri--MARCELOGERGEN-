@@ -52,6 +52,13 @@ else:
     mes_anterior    = primeiro_do_mes - timedelta(days=1)
     ano_mes         = mes_anterior.strftime("%Y-%m")
 
+ano, mes = ano_mes.split("-")
+
+print(f"Período histórico: {ano_mes}")
+print(f"Aeroportos filtrados: {', '.join(AIRPORTS)}")
+
+# ── URLs do VRA ───────────────────────────────────────────────────────────────
+
 MESES_PT = {
     "01": "Janeiro", "02": "Fevereiro", "03": "Março",
     "04": "Abril",   "05": "Maio",      "06": "Junho",
@@ -60,30 +67,34 @@ MESES_PT = {
 }
 nome_mes = MESES_PT[mes]
 
+# URL principal: pasta com nome do mês + arquivo VRA_AAAAMM.csv
 VRA_URL = (
     f"https://sistemas.anac.gov.br/dadosabertos/"
-    f"Voos%20e%20opera%C3%A7%C3%B5es%20a%C3%A9reas/Voo%20Regular%20Ativo%20%28VRA%29/{ano}/"
-    f"{mes}%20-%20{nome_mes}/VRA_{ano}{mes}.csv"
+    f"Voos%20e%20opera%C3%A7%C3%B5es%20a%C3%A9reas/Voo%20Regular%20Ativo%20%28VRA%29/"
+    f"{ano}/{mes}%20-%20{nome_mes}/VRA_{ano}{mes}.csv"
 )
-# URL alternativa (portal de dados abertos)
-VRA_URL_ALT = (f"https://www.gov.br/anac/pt-br/assuntos/dados-e-estatisticas/"
+
+# URL alternativa (portal gov.br)
+VRA_URL_ALT = (
+    f"https://www.gov.br/anac/pt-br/assuntos/dados-e-estatisticas/"
     f"dados-estatisticos/arquivos/VRA{ano}{mes}.csv"
 )
 
-# Mapeamento de colunas do CSV do VRA
+# ── Mapeamento de colunas ─────────────────────────────────────────────────────
 # (nomes reais no arquivo — podem variar levemente entre versões)
+
 COLS = {
-    "empresa":       ["EMPRESA (SIGLA)", "Empresa (Sigla)", "sg_empresa_icao"],
-    "voo":           ["NÚMERO VOO",      "Numero Voo",      "nr_voo"],
-    "origem":        ["ORIGEM",          "Aeroporto Origem","sg_icao_origem"],
-    "destino":       ["DESTINO",         "Aeroporto Destino","sg_icao_destino"],
-    "dt_ref":        ["DT_REFERENCIA",   "Dt Referencia",   "data_referencia"],
-    "partida_prev":  ["PARTIDA PREVISTA","Partida Prevista", "dt_partida_prevista"],
-    "partida_real":  ["PARTIDA REAL",    "Partida Real",    "dt_partida_real"],
-    "chegada_prev":  ["CHEGADA PREVISTA","Chegada Prevista", "dt_chegada_prevista"],
-    "chegada_real":  ["CHEGADA REAL",    "Chegada Real",    "dt_chegada_real"],
-    "situacao":      ["SITUAÇÃO DE VOO", "Situacao Voo",    "situacao"],
-    "motivo":        ["MOTIVO",          "Motivo Alteracao","motivo_alteracao"],
+    "empresa":      ["ICAO Empresa Aérea", "EMPRESA (SIGLA)", "Empresa (Sigla)", "sg_empresa_icao"],
+    "voo":          ["Número Voo",         "NÚMERO VOO",      "Numero Voo",      "nr_voo"],
+    "origem":       ["ICAO Aeródromo Origem",  "ORIGEM",      "Aeroporto Origem","sg_icao_origem"],
+    "destino":      ["ICAO Aeródromo Destino", "DESTINO",     "Aeroporto Destino","sg_icao_destino"],
+    "dt_ref":       ["DT_REFERENCIA",      "Dt Referencia",   "data_referencia"],
+    "partida_prev": ["Partida Prevista",   "PARTIDA PREVISTA","dt_partida_prevista"],
+    "partida_real": ["Partida Real",       "PARTIDA REAL",    "dt_partida_real"],
+    "chegada_prev": ["Chegada Prevista",   "CHEGADA PREVISTA","dt_chegada_prevista"],
+    "chegada_real": ["Chegada Real",       "CHEGADA REAL",    "dt_chegada_real"],
+    "situacao":     ["Situação Voo",       "SITUAÇÃO DE VOO", "Situacao Voo",    "situacao"],
+    "motivo":       ["Código Justificativa","MOTIVO",         "Motivo Alteracao","motivo_alteracao"],
 }
 
 
@@ -125,18 +136,27 @@ def baixar_vra() -> list[dict]:
     for url in [VRA_URL, VRA_URL_ALT]:
         print(f"\nGET {url}")
         try:
-           r.raise_for_status()
-texto = r.content.decode("latin-1", errors="replace")
+            r = requests.get(url, timeout=120)
+            if r.status_code == 404:
+                print(f"  Não encontrado (404) — tentando URL alternativa.")
+                continue
+            r.raise_for_status()
 
-# Detecta separador automaticamente (tabulação ou ponto-e-vírgula)
-primeira_linha = texto.splitlines()[0] if texto.splitlines() else ""
-sep = "\t" if "\t" in primeira_linha else ";"
+            # Decodifica com latin-1 (padrão do VRA)
+            texto = r.content.decode("latin-1", errors="replace")
 
-reader = csv.DictReader(io.StringIO(texto), delimiter=sep)
-registros = list(reader)
-print(f"  Separador detectado: {'TAB' if sep == chr(9) else sep!r}")
-print(f"  VRA carregado: {len(registros)} linhas brutas")
-return registros
+            # Detecta separador automaticamente (tabulação ou ponto-e-vírgula)
+            primeira_linha = texto.splitlines()[0] if texto.splitlines() else ""
+            sep = "\t" if "\t" in primeira_linha else ";"
+
+            reader    = csv.DictReader(io.StringIO(texto), delimiter=sep)
+            registros = list(reader)
+
+            print(f"  Separador detectado: {'TAB' if sep == chr(9) else repr(sep)}")
+            print(f"  Colunas encontradas: {list(registros[0].keys()) if registros else '(nenhuma)'}")
+            print(f"  VRA carregado: {len(registros)} linhas brutas")
+            return registros
+
         except Exception as e:
             print(f"  [ERRO] {e}")
     return []
@@ -152,28 +172,25 @@ def processar_vra(linhas: list[dict]) -> list[dict]:
         if origem not in AIRPORTS and destino not in AIRPORTS:
             continue
 
-        empresa       = get_col(row, "empresa")
-        nr_voo        = get_col(row, "voo")
-        dt_ref_str    = get_col(row, "dt_ref")
-        partida_prev  = get_col(row, "partida_prev")
-        partida_real  = get_col(row, "partida_real")
-        chegada_prev  = get_col(row, "chegada_prev")
-        chegada_real  = get_col(row, "chegada_real")
-        situacao      = get_col(row, "situacao")
-        motivo        = get_col(row, "motivo")
+        empresa      = get_col(row, "empresa")
+        nr_voo       = get_col(row, "voo")
+        dt_ref_str   = get_col(row, "dt_ref")
+        partida_prev = get_col(row, "partida_prev")
+        partida_real = get_col(row, "partida_real")
+        chegada_prev = get_col(row, "chegada_prev")
+        chegada_real = get_col(row, "chegada_real")
+        situacao     = get_col(row, "situacao")
+        motivo       = get_col(row, "motivo")
 
         # Data de referência
         dt_ref = None
         if dt_ref_str:
-            try:
-                for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
-                    try:
-                        dt_ref = datetime.strptime(dt_ref_str.strip(), fmt).date().isoformat()
-                        break
-                    except ValueError:
-                        continue
-            except Exception:
-                pass
+            for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
+                try:
+                    dt_ref = datetime.strptime(dt_ref_str.strip(), fmt).date().isoformat()
+                    break
+                except ValueError:
+                    continue
 
         resultado.append({
             "ano_mes":          ano_mes,
@@ -196,7 +213,7 @@ def processar_vra(linhas: list[dict]) -> list[dict]:
 
 # ── Inserção no Supabase ──────────────────────────────────────────────────────
 
-linhas_vra  = baixar_vra()
+linhas_vra = baixar_vra()
 if not linhas_vra:
     print("\n[AVISO] VRA não disponível para o período. Encerrando.")
     sys.exit(0)
