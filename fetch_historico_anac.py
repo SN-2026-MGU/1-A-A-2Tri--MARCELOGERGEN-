@@ -125,17 +125,18 @@ def baixar_vra() -> list[dict]:
     for url in [VRA_URL, VRA_URL_ALT]:
         print(f"\nGET {url}")
         try:
-            r = requests.get(url, timeout=120)
-            if r.status_code == 404:
-                print(f"  Não encontrado (404) — tentando URL alternativa.")
-                continue
-            r.raise_for_status()
-            # Decodifica com latin-1 (padrão do VRA)
-            texto = r.content.decode("latin-1", errors="replace")
-            reader = csv.DictReader(io.StringIO(texto), delimiter=";")
-            registros = list(reader)
-            print(f"  VRA carregado: {len(registros)} linhas brutas")
-            return registros
+           r.raise_for_status()
+texto = r.content.decode("latin-1", errors="replace")
+
+# Detecta separador automaticamente (tabulação ou ponto-e-vírgula)
+primeira_linha = texto.splitlines()[0] if texto.splitlines() else ""
+sep = "\t" if "\t" in primeira_linha else ";"
+
+reader = csv.DictReader(io.StringIO(texto), delimiter=sep)
+registros = list(reader)
+print(f"  Separador detectado: {'TAB' if sep == chr(9) else sep!r}")
+print(f"  VRA carregado: {len(registros)} linhas brutas")
+return registros
         except Exception as e:
             print(f"  [ERRO] {e}")
     return []
