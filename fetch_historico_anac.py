@@ -52,20 +52,19 @@ else:
     mes_anterior    = primeiro_do_mes - timedelta(days=1)
     ano_mes         = mes_anterior.strftime("%Y-%m")
 
-ano, mes = ano_mes.split("-")
+MESES_PT = {
+    "01": "Janeiro", "02": "Fevereiro", "03": "Março",
+    "04": "Abril",   "05": "Maio",      "06": "Junho",
+    "07": "Julho",   "08": "Agosto",    "09": "Setembro",
+    "10": "Outubro", "11": "Novembro",  "12": "Dezembro",
+}
+nome_mes = MESES_PT[mes]
 
-print(f"Período histórico: {ano_mes}")
-print(f"Aeroportos filtrados: {', '.join(AIRPORTS)}")
-
-# ── URL do VRA ────────────────────────────────────────────────────────────────
-# Formato do portal ANAC:
-# https://sistemas.anac.gov.br/dadosabertos/Voos%20e%20opera%C3%A7%C3%B5es/VRA/YYYY/AAAAMM.csv
 VRA_URL = (
-    f"f"https://sistemas.anac.gov.br/dadosabertos/"
+    f"https://sistemas.anac.gov.br/dadosabertos/"
     f"Voos%20e%20opera%C3%A7%C3%B5es%20a%C3%A9reas/Voo%20Regular%20Ativo%20%28VRA%29/{ano}/"
-    f"{mes}%20-%20{nome_mes}/VRA_{ano}{mes}.csv""
+    f"{mes}%20-%20{nome_mes}/VRA_{ano}{mes}.csv"
 )
-
 # URL alternativa (portal de dados abertos)
 VRA_URL_ALT = (f"https://www.gov.br/anac/pt-br/assuntos/dados-e-estatisticas/"
     f"dados-estatisticos/arquivos/VRA{ano}{mes}.csv"
